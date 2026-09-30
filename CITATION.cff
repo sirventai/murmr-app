@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use Murmr in your research, academic work, or software projects, please cite it as below."
+title: "Murmr: Zero-Trust End-to-End Encrypted Messaging with Acoustic Out-of-Band Key Exchange"
+type: software
+authors:
+  - family-names: "Sirvent Jiménez"
+    given-names: "Pablo"
+    email: "pablo@purebyte.ai"
+    affiliation: "Universitat Oberta de Catalunya (UOC)"
+repository-code: "https://github.com/sirventai/murmr-app"
+license: MIT
+version: 1.0.0
+date-released: 2026-05-08
+abstract: >-
+  Murmr is a cross-platform (Android, iOS, Desktop) end-to-end encrypted
+  messaging application developed as a Final Degree Project (Trabajo de Fin
+  de Grado - TFG) in Computer Engineering at the Universitat Oberta de
+  Catalunya (UOC). It introduces an innovative physical acoustic channel
+  operating at near-ultrasonic frequencies (15-19 kHz) for out-of-band (OOB)
+  cryptographic key exchange, fully mitigating Trust-On-First-Use (TOFU)
+  risks and eliminating reliance on central key directories. Subsequent
+  communication uses AES-256-GCM authenticated encryption routed through
+  a zero-knowledge relay server.
+keywords:
+  - end-to-end encryption
+  - acoustic key exchange
+  - out-of-band authentication
+  - near-ultrasound
+  - kotlin multiplatform
+  - compose multiplatform
+  - zero-knowledge
+  - computer engineering
+  - uoc tfg

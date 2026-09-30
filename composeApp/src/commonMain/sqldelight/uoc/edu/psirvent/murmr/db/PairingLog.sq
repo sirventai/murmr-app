@@ -1,0 +1,32 @@
+-- Diario auditable de eventos de emparejamiento. Cada vez que se completa un
+-- pairing inicial o un re-pairing se inserta una fila con el SAS confirmado
+-- y la calidad del canal medida. El ContactDetailScreen lo muestra para que
+-- el usuario pueda revisar el historial criptográfico de un contacto y
+-- detectar patrones extraños (re-pairings inesperados, por ejemplo).
+CREATE TABLE pairing_log (
+    log_id      TEXT NOT NULL PRIMARY KEY,
+    contact_id  TEXT NOT NULL,
+    event_type  TEXT NOT NULL,
+    timestamp   INTEGER NOT NULL,
+    details     TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (contact_id) REFERENCES contacts(contact_id) ON DELETE CASCADE
+);
+
+CREATE INDEX pairing_log_by_contact ON pairing_log(contact_id, timestamp);
+
+selectAllForContact:
+SELECT *
+FROM pairing_log
+WHERE contact_id = :contactId
+ORDER BY timestamp DESC;
+
+insert:
+INSERT INTO pairing_log(log_id, contact_id, event_type, timestamp, details)
+VALUES (:logId, :contactId, :eventType, :timestamp, :details);
+
+deleteByContact:
+DELETE FROM pairing_log
+WHERE contact_id = :contactId;
+
+deleteAll:
+DELETE FROM pairing_log;

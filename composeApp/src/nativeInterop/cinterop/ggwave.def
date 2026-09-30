@@ -1,0 +1,6 @@
+package = ggwave
+language = C
+headers = ggwave.h
+headerFilter = ggwave.h
+linkerOpts = -lc++
+staticLibraries = libggwave.a

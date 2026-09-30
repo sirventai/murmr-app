@@ -1,0 +1,37 @@
+-- Lista de dispositivos bloqueados explícitamente por el usuario. El receptor
+-- de mensajes consulta esta tabla antes de procesar cualquier envelope entrante;
+-- si el sender está bloqueado, descarta sin avisar al usuario para no convertir
+-- el bloqueo en un canal lateral de información.
+--
+-- A diferencia de delete_contact, bloquear es reversible y no implica perder el
+-- histórico - sólo deja de aceptar nuevos mensajes hasta que se desbloquee.
+CREATE TABLE blocked_contacts (
+    block_id           TEXT NOT NULL PRIMARY KEY,
+    owner_device_id    TEXT NOT NULL,
+    blocked_device_id  TEXT NOT NULL,
+    blocked_at         INTEGER NOT NULL,
+    reason             TEXT,
+    UNIQUE (owner_device_id, blocked_device_id)
+);
+
+selectAll:
+SELECT *
+FROM blocked_contacts
+WHERE owner_device_id = :owner
+ORDER BY blocked_at DESC;
+
+isBlocked:
+SELECT COUNT(*) > 0
+FROM blocked_contacts
+WHERE owner_device_id = :owner AND blocked_device_id = :remote;
+
+insert:
+INSERT OR IGNORE INTO blocked_contacts(block_id, owner_device_id, blocked_device_id, blocked_at, reason)
+VALUES (:blockId, :ownerDeviceId, :blockedDeviceId, :blockedAt, :reason);
+
+deleteByDevice:
+DELETE FROM blocked_contacts
+WHERE owner_device_id = :owner AND blocked_device_id = :remote;
+
+deleteAll:
+DELETE FROM blocked_contacts;

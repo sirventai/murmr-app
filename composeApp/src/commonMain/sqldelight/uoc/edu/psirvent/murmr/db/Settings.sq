@@ -1,0 +1,58 @@
+-- session_expiry/auto_lock_timeout almacenan el nombre del enum; cuando vale
+-- CUSTOM, los campos numéricos custom_expiry_seconds y custom_autolock_secs
+-- son los que valen. Default 14 dias = 1209600 s.
+CREATE TABLE settings (
+    device_id              TEXT NOT NULL PRIMARY KEY,
+    session_expiry         TEXT NOT NULL,
+    biometric_lock         INTEGER NOT NULL DEFAULT 0,
+    auto_lock_timeout      TEXT NOT NULL,
+    notifications_enabled  INTEGER NOT NULL DEFAULT 1,
+    onboarding_done        INTEGER NOT NULL DEFAULT 0,
+    app_version            TEXT NOT NULL,
+    updated_at             INTEGER NOT NULL,
+    custom_expiry_seconds  INTEGER NOT NULL DEFAULT 1209600,
+    custom_autolock_secs   INTEGER NOT NULL DEFAULT 30,
+    onboarding_step        INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (device_id) REFERENCES users(device_id) ON DELETE CASCADE
+);
+
+selectByDevice:
+SELECT *
+FROM settings
+WHERE device_id = :deviceId;
+
+selectFirst:
+SELECT *
+FROM settings
+LIMIT 1;
+
+upsert:
+INSERT OR REPLACE INTO settings(device_id, session_expiry, biometric_lock, auto_lock_timeout, notifications_enabled, onboarding_done, app_version, updated_at, custom_expiry_seconds, custom_autolock_secs, onboarding_step)
+VALUES (:deviceId, :sessionExpiry, :biometricLock, :autoLockTimeout, :notificationsEnabled, :onboardingDone, :appVersion, :updatedAt, :customExpirySeconds, :customAutolockSecs, :onboardingStep);
+
+updateSessionExpiry:
+UPDATE settings SET session_expiry = :value, updated_at = :ts WHERE device_id = :deviceId;
+
+updateBiometric:
+UPDATE settings SET biometric_lock = :value, updated_at = :ts WHERE device_id = :deviceId;
+
+updateAutoLock:
+UPDATE settings SET auto_lock_timeout = :value, updated_at = :ts WHERE device_id = :deviceId;
+
+updateNotifications:
+UPDATE settings SET notifications_enabled = :value, updated_at = :ts WHERE device_id = :deviceId;
+
+updateCustomExpirySeconds:
+UPDATE settings SET custom_expiry_seconds = :value, updated_at = :ts WHERE device_id = :deviceId;
+
+updateCustomAutoLockSecs:
+UPDATE settings SET custom_autolock_secs = :value, updated_at = :ts WHERE device_id = :deviceId;
+
+markOnboardingDone:
+UPDATE settings SET onboarding_done = 1, updated_at = :ts WHERE device_id = :deviceId;
+
+setOnboardingStep:
+UPDATE settings SET onboarding_step = :step, updated_at = :ts WHERE device_id = :deviceId;
+
+deleteAll:
+DELETE FROM settings;

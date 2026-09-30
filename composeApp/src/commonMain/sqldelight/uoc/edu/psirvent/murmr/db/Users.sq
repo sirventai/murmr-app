@@ -1,0 +1,51 @@
+-- Tabla con la identidad local del dispositivo. En Murmr siempre hay como mucho
+-- una fila - no soportamos múltiples cuentas en el mismo install. La PK es el
+-- UUID v4 que se genera al completar el onboarding y que se publica al relay
+-- para que pueda enrutar mensajes.
+--
+-- public_key/private_key son los 32 bytes raw del par X25519, en little-endian
+-- según RFC 7748. La private_key NUNCA debería salir de este dispositivo.
+-- avatar = thumbnail 256 px (~30 KB) que viaja en PROFILE_UPDATE.
+-- avatar_big = versión grande 1024 px (~150 KB), solo local; se sirve a quien
+-- la pida explícitamente con AVATAR_REQUEST. NUNCA se difunde proactivamente.
+CREATE TABLE users (
+    device_id   TEXT NOT NULL PRIMARY KEY,
+    alias       TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    public_key  BLOB NOT NULL,
+    private_key BLOB NOT NULL,
+    avatar      BLOB,
+    avatar_big  BLOB
+);
+
+selectLocal:
+SELECT *
+FROM users
+LIMIT 1;
+
+selectById:
+SELECT *
+FROM users
+WHERE device_id = :deviceId;
+
+upsert:
+INSERT OR REPLACE INTO users(device_id, alias, created_at, public_key, private_key, avatar, avatar_big)
+VALUES (:deviceId, :alias, :createdAt, :publicKey, :privateKey, :avatar, :avatarBig);
+
+updateAlias:
+UPDATE users
+SET alias = :alias
+WHERE device_id = :deviceId;
+
+updateAvatar:
+UPDATE users
+SET avatar = :avatar
+WHERE device_id = :deviceId;
+
+updateAvatarBig:
+UPDATE users
+SET avatar_big = :avatarBig
+WHERE device_id = :deviceId;
+
+deleteAll:
+DELETE FROM users;

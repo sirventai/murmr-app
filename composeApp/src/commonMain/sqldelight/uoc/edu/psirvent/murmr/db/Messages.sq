@@ -1,0 +1,149 @@
+-- Almacén local de mensajes del chat. Guardo tanto el ciphertext (los bytes que
+-- realmente viajaron por el relay) como el plaintext_local descifrado, para que
+-- la UI pueda pintar la lista sin descifrar en cada redibujado.
+--
+-- El plaintext_local está protegido por el cifrado en reposo del dispositivo,
+-- no por una capa adicional. Se va junto con todo lo demás cuando se hace
+-- secure wipe (ON DELETE CASCADE desde sessions y contacts).
+--
+-- type identifica si es un mensaje normal (TEXT) o uno de control: READ_RECEIPT,
+-- PROFILE_UPDATE, MESSAGE_EDIT, MESSAGE_DELETE. Los de control se procesan en
+-- el ReceiveDecryptMessageUseCase pero no se persisten como mensajes visibles.
+CREATE TABLE messages (
+    message_id           TEXT NOT NULL PRIMARY KEY,
+    session_id           TEXT NOT NULL,
+    sender_device_id     TEXT NOT NULL,
+    ciphertext           BLOB NOT NULL,
+    iv                   BLOB NOT NULL,
+    auth_tag             BLOB NOT NULL,
+    plaintext_local      TEXT NOT NULL,
+    timestamp            INTEGER NOT NULL,
+    status               TEXT NOT NULL,
+    is_outgoing          INTEGER NOT NULL,
+    type                 TEXT NOT NULL DEFAULT 'TEXT',
+    reply_to_message_id  TEXT,
+    edited               INTEGER NOT NULL DEFAULT 0,
+    read_receipt_sent_at INTEGER,
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+);
+
+CREATE INDEX messages_by_session_ts ON messages(session_id, timestamp);
+
+selectById:
+SELECT *
+FROM messages
+WHERE message_id = :messageId;
+
+selectBySession:
+SELECT *
+FROM messages
+WHERE session_id = :sessionId
+ORDER BY timestamp ASC;
+
+selectLastBySession:
+SELECT *
+FROM messages
+WHERE session_id = :sessionId
+ORDER BY timestamp DESC
+LIMIT 1;
+
+-- Solo mensajes TEXT en la UI del chat. READ_RECEIPT y PROFILE_UPDATE se persisten
+-- localmente (el emisor también los guarda) pero NO deben aparecer como burbujas.
+selectByContact:
+SELECT m.*
+FROM messages m
+INNER JOIN sessions s ON s.session_id = m.session_id
+WHERE s.contact_id = :contactId AND m.type = 'TEXT'
+ORDER BY m.timestamp ASC;
+
+-- Paginación: devolvemos los últimos `:limit` mensajes TEXT en orden DESC.
+-- (SQLDelight no admite envolver `SELECT *` en otro SELECT con re-orden ASC sin
+-- cualificar mal las columnas. El repositorio se encarga de invertir en Kotlin.)
+selectByContactRecent:
+SELECT m.message_id, m.session_id, m.sender_device_id, m.ciphertext, m.iv,
+       m.auth_tag, m.plaintext_local, m.timestamp, m.status, m.is_outgoing,
+       m.type, m.reply_to_message_id, m.edited, m.read_receipt_sent_at
+FROM messages m
+INNER JOIN sessions s ON s.session_id = m.session_id
+WHERE s.contact_id = :contactId AND m.type = 'TEXT'
+ORDER BY m.timestamp DESC
+LIMIT :limit;
+
+-- Paginación hacia atrás: los `:limit` mensajes TEXT del contacto con timestamp
+-- estrictamente anterior a `:beforeTs`, también en DESC (el caller invierte).
+selectByContactBefore:
+SELECT m.message_id, m.session_id, m.sender_device_id, m.ciphertext, m.iv,
+       m.auth_tag, m.plaintext_local, m.timestamp, m.status, m.is_outgoing,
+       m.type, m.reply_to_message_id, m.edited, m.read_receipt_sent_at
+FROM messages m
+INNER JOIN sessions s ON s.session_id = m.session_id
+WHERE s.contact_id = :contactId AND m.type = 'TEXT' AND m.timestamp < :beforeTs
+ORDER BY m.timestamp DESC
+LIMIT :limit;
+
+-- Cuenta total de mensajes TEXT del contacto. Sirve para que la UI sepa si hay
+-- más páginas históricas que cargar (count > messages.size → mostrar "Cargar más").
+countTextByContact:
+SELECT COUNT(*)
+FROM messages m
+INNER JOIN sessions s ON s.session_id = m.session_id
+WHERE s.contact_id = :contactId AND m.type = 'TEXT';
+
+selectLastByContact:
+SELECT m.*
+FROM messages m
+INNER JOIN sessions s ON s.session_id = m.session_id
+WHERE s.contact_id = :contactId AND m.type = 'TEXT'
+ORDER BY m.timestamp DESC
+LIMIT 1;
+
+countPendingOutgoing:
+SELECT COUNT(*)
+FROM messages
+WHERE is_outgoing = 1 AND status IN ('SENDING', 'PENDING');
+
+countOutgoingBySession:
+SELECT COUNT(*)
+FROM messages
+WHERE session_id = :sessionId AND is_outgoing = 1;
+
+insert:
+INSERT INTO messages(message_id, session_id, sender_device_id, ciphertext, iv, auth_tag, plaintext_local, timestamp, status, is_outgoing, type, reply_to_message_id, edited, read_receipt_sent_at)
+VALUES (:messageId, :sessionId, :senderDeviceId, :ciphertext, :iv, :authTag, :plaintextLocal, :timestamp, :status, :isOutgoing, :type, :replyToMessageId, :edited, :readReceiptSentAt);
+
+updateStatus:
+UPDATE messages
+SET status = :status
+WHERE message_id = :messageId;
+
+updateStatusForIds:
+UPDATE messages
+SET status = ?
+WHERE message_id IN ?;
+
+markEdited:
+UPDATE messages
+SET plaintext_local = :plaintextLocal, edited = 1
+WHERE message_id = :messageId;
+
+markReadReceiptSent:
+UPDATE messages
+SET read_receipt_sent_at = :ts
+WHERE message_id = :messageId;
+
+selectIncomingUnreadBySession:
+SELECT *
+FROM messages
+WHERE session_id = :sessionId AND is_outgoing = 0 AND read_receipt_sent_at IS NULL
+ORDER BY timestamp ASC;
+
+deleteBySession:
+DELETE FROM messages
+WHERE session_id = :sessionId;
+
+deleteByContact:
+DELETE FROM messages
+WHERE session_id IN (SELECT session_id FROM sessions WHERE contact_id = :contactId);
+
+deleteAll:
+DELETE FROM messages;

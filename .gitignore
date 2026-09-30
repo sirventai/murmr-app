@@ -1,0 +1,50 @@
+# Gradle & Build Artifacts
+.gradle/
+build/
+**/build/
+.kotlin/
+out/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android Specific & Binaries
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+*.keystore
+*.jks
+
+# IDE & Editor Specific
+.idea/
+*.iml
+*.ipr
+*.iws
+*.swp
+*~
+
+# iOS / Xcode
+xcuserdata/
+DerivedData/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# OS & Environment
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+!gradle/wrapper/gradle-wrapper.jar

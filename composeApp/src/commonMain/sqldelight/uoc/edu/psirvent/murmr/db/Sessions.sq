@@ -1,0 +1,89 @@
+-- Sesiones criptográficas con cada contacto. Cada contacto puede tener varias
+-- filas a la vez: una con status ACTIVE (la actual), y posiblemente alguna
+-- SUPERSEDED durante la ventana de 24h tras una rotación de forward secrecy.
+--
+-- session_key_ref es un alias hacia el KeyStoreManager (Android Keystore /
+-- iOS Keychain / vault JVM). La propia clave AES-256 nunca se guarda en esta
+-- tabla - sólo el alias para recuperarla.
+--
+-- rotation_index forma una cadena enlazada con previous_session_id que permite
+-- mostrar el histórico completo de keys de un contacto en ContactDetailScreen.
+-- renewed_at: timestamp en el que el usuario pulsó "Renovar plazo" para resetear
+-- el contador de expiración. La sesión expira cuando `(renewed_at ?: created_at)
+-- + EffectiveExpiry.duration < now`. Permite extender una sesión legítima sin
+-- tener que re-emparejar acústicamente.
+CREATE TABLE sessions (
+    session_id          TEXT NOT NULL PRIMARY KEY,
+    contact_id          TEXT NOT NULL,
+    session_key_ref     TEXT NOT NULL,
+    created_at          INTEGER NOT NULL,
+    expires_at          INTEGER,
+    sas_code            TEXT NOT NULL,
+    fingerprint         TEXT NOT NULL,
+    status              TEXT NOT NULL,
+    rotation_index      INTEGER NOT NULL DEFAULT 0,
+    previous_session_id TEXT,
+    renewed_at          INTEGER,
+    FOREIGN KEY (contact_id) REFERENCES contacts(contact_id) ON DELETE CASCADE
+);
+
+CREATE INDEX sessions_by_contact ON sessions(contact_id, status);
+CREATE INDEX sessions_by_rotation ON sessions(contact_id, rotation_index);
+
+selectAll:
+SELECT *
+FROM sessions;
+
+selectById:
+SELECT *
+FROM sessions
+WHERE session_id = :sessionId;
+
+selectActiveForContact:
+SELECT *
+FROM sessions
+WHERE contact_id = :contactId AND status = 'ACTIVE'
+ORDER BY created_at DESC
+LIMIT 1;
+
+selectAllForContact:
+SELECT *
+FROM sessions
+WHERE contact_id = :contactId
+ORDER BY created_at DESC;
+
+selectByContactNonRevoked:
+SELECT *
+FROM sessions
+WHERE contact_id = :contactId AND status IN ('ACTIVE', 'SUPERSEDED')
+ORDER BY rotation_index DESC;
+
+insert:
+INSERT INTO sessions(session_id, contact_id, session_key_ref, created_at, expires_at, sas_code, fingerprint, status, rotation_index, previous_session_id)
+VALUES (:sessionId, :contactId, :sessionKeyRef, :createdAt, :expiresAt, :sasCode, :fingerprint, :status, :rotationIndex, :previousSessionId);
+
+updateStatus:
+UPDATE sessions
+SET status = :status
+WHERE session_id = :sessionId;
+
+updateExpiry:
+UPDATE sessions
+SET expires_at = :expiresAt
+WHERE session_id = :sessionId;
+
+markRenewed:
+UPDATE sessions
+SET renewed_at = :renewedAt
+WHERE session_id = :sessionId;
+
+deleteById:
+DELETE FROM sessions
+WHERE session_id = :sessionId;
+
+deleteAllForContact:
+DELETE FROM sessions
+WHERE contact_id = :contactId;
+
+deleteAll:
+DELETE FROM sessions;

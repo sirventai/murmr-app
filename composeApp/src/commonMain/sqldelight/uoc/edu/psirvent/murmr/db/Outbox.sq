@@ -1,0 +1,52 @@
+-- Cola persistente de mensajes pendientes de enviar al relay.
+--
+-- Cuando un envío falla (relay caído, sin red, etc.), el SendEncryptedMessageUseCase
+-- deja aquí el envelope serializado para que el OutboxWorker lo reintente más tarde.
+-- attempts cuenta los intentos fallidos y next_retry_at determina cuándo el worker
+-- volverá a probar (backoff exponencial). Tras 10 intentos sin éxito el mensaje se
+-- descarta y el ChatScreen lo pinta como FAILED.
+-- last_error guarda el mensaje (truncado) de la última excepción al intentar
+-- enviar. Si el mensaje se descarta tras 10 reintentos, este campo le dice al
+-- usuario por qué falló (timeout, 401, conexión rechazada...) en vez de mostrar
+-- "FAILED" sin contexto.
+CREATE TABLE outbox (
+    message_id     TEXT NOT NULL PRIMARY KEY,
+    payload_json   TEXT NOT NULL,
+    attempts       INTEGER NOT NULL DEFAULT 0,
+    next_retry_at  INTEGER NOT NULL,
+    created_at     INTEGER NOT NULL,
+    last_error     TEXT
+);
+
+CREATE INDEX outbox_by_next_retry ON outbox(next_retry_at);
+
+selectDue:
+SELECT *
+FROM outbox
+WHERE next_retry_at <= :now
+ORDER BY next_retry_at ASC
+LIMIT :limit;
+
+selectAll:
+SELECT *
+FROM outbox
+ORDER BY created_at ASC;
+
+count:
+SELECT COUNT(*) FROM outbox;
+
+upsert:
+INSERT OR REPLACE INTO outbox(message_id, payload_json, attempts, next_retry_at, created_at, last_error)
+VALUES (:messageId, :payloadJson, :attempts, :nextRetryAt, :createdAt, :lastError);
+
+bumpAttempts:
+UPDATE outbox
+SET attempts = attempts + 1, next_retry_at = :nextRetryAt, last_error = :lastError
+WHERE message_id = :messageId;
+
+deleteById:
+DELETE FROM outbox
+WHERE message_id = :messageId;
+
+deleteAll:
+DELETE FROM outbox;
